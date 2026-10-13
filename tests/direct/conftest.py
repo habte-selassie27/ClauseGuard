@@ -30,8 +30,18 @@ LLM_MATCH = r"You are evaluating whether submitted evidence"
 
 
 def register_docs_obligation(contract, vm, owner, obligor, criteria=None, types=None,
-                             min_ev=1, max_ev=1):
-    """Register the documentation obligation. owner is the sender."""
+                             min_ev=1, max_ev=1, trusted_hosts=None, allow_any=None):
+    """Register the documentation obligation. owner is the sender.
+
+    Source policy is explicit in the contract: either a non-empty
+    ``trusted_hosts`` allowlist or ``allow_any_https_source=True``. When
+    ``allow_any`` is not given it is derived from ``trusted_hosts`` so callers
+    keep the old "no list means any host" ergonomics while the ABI stays
+    fail-closed.
+    """
+    hosts = trusted_hosts if trusted_hosts is not None else []
+    if allow_any is None:
+        allow_any = not hosts
     vm.sender = owner
     return contract.register_obligation(
         "Provide documentation covering installation, configuration and troubleshooting.",
@@ -40,6 +50,8 @@ def register_docs_obligation(contract, vm, owner, obligor, criteria=None, types=
         min_ev,
         max_ev,
         json.dumps(types if types is not None else DOCS_TYPES),
+        json.dumps(hosts),
+        allow_any,
     )
 
 
@@ -68,3 +80,17 @@ def submit_docs(contract, vm, obligor, url=DOCS_URL, obligation_id=None, oid=Non
     vm.sender = obligor
     evidence = json.dumps([{"type": "documentation", "ref": url}])
     return contract.submit_evidence(oid, evidence)
+
+
+def load_contract_module():
+    """Return the live GenVM-loaded contract module (gltest names it
+    ``_contract_clause_guard``). Deploy the contract first."""
+    import sys
+
+    for module in list(sys.modules.values()):
+        path = getattr(module, "__file__", None)
+        if path and path.endswith("contracts/clause_guard.py") and hasattr(
+            module, "_parse_https_url"
+        ):
+            return module
+    raise AssertionError("contract module not loaded: deploy the contract first")

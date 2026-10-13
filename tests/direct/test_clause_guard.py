@@ -20,10 +20,12 @@ OPT_CRITERIA = [
 ]
 
 
-def _setup(direct_vm, direct_deploy, owner, obligor, criteria=None, min_ev=1, max_ev=1):
+def _setup(direct_vm, direct_deploy, owner, obligor, criteria=None, min_ev=1, max_ev=1,
+           trusted_hosts=None):
     contract = direct_deploy("contracts/clause_guard.py")
     oid = register_docs_obligation(
-        contract, direct_vm, owner, obligor, criteria=criteria, min_ev=min_ev, max_ev=max_ev
+        contract, direct_vm, owner, obligor, criteria=criteria, min_ev=min_ev,
+        max_ev=max_ev, trusted_hosts=trusted_hosts
     )
     return contract, oid
 
@@ -38,6 +40,8 @@ def test_register_and_read_obligation(direct_vm, direct_deploy, direct_alice, di
     assert obl["obligor"] == to_hex(direct_bob)
     assert obl["status"] == "active"
     assert obl["version"] == 1
+    assert obl["allow_any_https_source"] is True
+    assert json.loads(obl["trusted_hosts_json"]) == []
     assert json.loads(obl["criteria_json"]) == DOCS_CRITERIA
 
 
@@ -66,18 +70,22 @@ def test_register_validation(direct_vm, direct_deploy, direct_alice, direct_bob)
     bob = to_hex(direct_bob)
     good_crit = json.dumps(DOCS_CRITERIA)
     good_types = json.dumps(["documentation"])
+    no_hosts = json.dumps([])
 
     with direct_vm.expect_revert("description must be non-empty"):
-        contract.register_obligation("", bob, good_crit, 1, 1, good_types)
+        contract.register_obligation("", bob, good_crit, 1, 1, good_types, no_hosts, True)
     with direct_vm.expect_revert("obligor must be a valid address"):
-        contract.register_obligation("d", "not-an-address", good_crit, 1, 1, good_types)
+        contract.register_obligation(
+            "d", "not-an-address", good_crit, 1, 1, good_types, no_hosts, True
+        )
     with direct_vm.expect_revert("criteria_json is not valid JSON"):
-        contract.register_obligation("d", bob, "{not json", 1, 1, good_types)
+        contract.register_obligation("d", bob, "{not json", 1, 1, good_types, no_hosts, True)
     with direct_vm.expect_revert("criteria must be a non-empty list"):
-        contract.register_obligation("d", bob, "[]", 1, 1, good_types)
+        contract.register_obligation("d", bob, "[]", 1, 1, good_types, no_hosts, True)
     with direct_vm.expect_revert("at least one required"):
         contract.register_obligation(
-            "d", bob, json.dumps([{"id": "x", "text": "t", "required": False}]), 1, 1, good_types
+            "d", bob, json.dumps([{"id": "x", "text": "t", "required": False}]),
+            1, 1, good_types, no_hosts, True
         )
     with direct_vm.expect_revert("duplicate criterion id"):
         contract.register_obligation(
@@ -86,12 +94,66 @@ def test_register_validation(direct_vm, direct_deploy, direct_alice, direct_bob)
                 {"id": "x", "text": "a", "required": True},
                 {"id": "x", "text": "b", "required": True},
             ]),
-            1, 1, good_types,
+            1, 1, good_types, no_hosts, True,
         )
     with direct_vm.expect_revert("invalid evidence bounds"):
-        contract.register_obligation("d", bob, good_crit, 5, 2, good_types)
+        contract.register_obligation("d", bob, good_crit, 5, 2, good_types, no_hosts, True)
     with direct_vm.expect_revert("allowed_types must be a non-empty list"):
-        contract.register_obligation("d", bob, good_crit, 1, 1, "[]")
+        contract.register_obligation("d", bob, good_crit, 1, 1, "[]", no_hosts, True)
+    # evidence must be required (no zero-evidence obligations).
+    with direct_vm.expect_revert("min_evidence must be at least 1"):
+        contract.register_obligation("d", bob, good_crit, 0, 1, good_types, no_hosts, True)
+    # trusted-source policy validation
+    with direct_vm.expect_revert("trusted host must be a bare hostname"):
+        contract.register_obligation(
+            "d", bob, good_crit, 1, 1, good_types,
+            json.dumps(["https://evil.com/path"]), False,
+        )
+    with direct_vm.expect_revert("trusted_hosts must be a list"):
+        contract.register_obligation("d", bob, good_crit, 1, 1, good_types, "{}", True)
+
+
+# ---------------------------------------------------------------------------
+# Evidence-source handling (HTTPS-only + trusted-source policy + provenance)
+# ---------------------------------------------------------------------------
+def test_evidence_must_be_https(direct_vm, direct_deploy, direct_alice, direct_bob):
+    contract, oid = _setup(direct_vm, direct_deploy, direct_alice, direct_bob, min_ev=1, max_ev=1)
+    direct_vm.sender = direct_bob
+    with direct_vm.expect_revert("must be an https URL"):
+        contract.submit_evidence(
+            oid, json.dumps([{"type": "documentation", "ref": "http://plain.example.com/x"}])
+        )
+    # https accepted, and provenance host is recorded
+    sid = contract.submit_evidence(
+        oid, json.dumps([{"type": "documentation", "ref": "https://Example.COM/docs?a=1"}])
+    )
+    ev = json.loads(contract.get_submission(sid)["evidence_json"])
+    assert ev[0]["host"] == "example.com"
+
+
+def test_trusted_source_policy_enforced(direct_vm, direct_deploy, direct_alice, direct_bob):
+    contract, oid = _setup(
+        direct_vm, direct_deploy, direct_alice, direct_bob,
+        min_ev=1, max_ev=1, trusted_hosts=["docs.python.org"],
+    )
+    direct_vm.sender = direct_bob
+    # off-policy host rejected
+    with direct_vm.expect_revert("not in trusted sources"):
+        contract.submit_evidence(
+            oid, json.dumps([{"type": "documentation", "ref": "https://evil.example.net/x"}])
+        )
+    # exact host accepted
+    sid = contract.submit_evidence(
+        oid, json.dumps([{"type": "documentation", "ref": "https://docs.python.org/tutorial"}])
+    )
+    assert json.loads(contract.get_submission(sid)["evidence_json"])[0]["host"] == "docs.python.org"
+
+    # subdomain of a trusted host is accepted
+    sid2 = contract.submit_evidence(
+        oid,
+        json.dumps([{"type": "documentation", "ref": "https://sub.docs.python.org/a"}]),
+    )
+    assert json.loads(contract.get_submission(sid2)["evidence_json"])[0]["host"] == "sub.docs.python.org"
 
 
 # ---------------------------------------------------------------------------
@@ -128,18 +190,18 @@ def test_submit_evidence_validation(direct_vm, direct_deploy, direct_alice, dire
         contract.submit_evidence(oid, ev([]))
     with direct_vm.expect_revert("too many evidence items"):
         contract.submit_evidence(
-            oid, ev([{"type": "documentation", "ref": "http://a"}, {"type": "documentation", "ref": "http://b"}, {"type": "documentation", "ref": "http://c"}])
+            oid, ev([{"type": "documentation", "ref": "https://a.example.com"}, {"type": "documentation", "ref": "https://b.example.com"}, {"type": "documentation", "ref": "https://c.example.com"}])
         )
     with direct_vm.expect_revert("evidence type not allowed"):
-        contract.submit_evidence(oid, ev([{"type": "image", "ref": "http://a"}]))
-    with direct_vm.expect_revert("must be an http"):
-        contract.submit_evidence(oid, ev([{"type": "documentation", "ref": "ftp://a"}]))
+        contract.submit_evidence(oid, ev([{"type": "image", "ref": "https://a.example.com"}]))
+    with direct_vm.expect_revert("must be an https URL"):
+        contract.submit_evidence(oid, ev([{"type": "documentation", "ref": "ftp://a.example.com"}]))
     with direct_vm.expect_revert("duplicate evidence ref"):
         contract.submit_evidence(
-            oid, ev([{"type": "documentation", "ref": "http://a"}, {"type": "documentation", "ref": "http://a"}])
+            oid, ev([{"type": "documentation", "ref": "https://a.example.com"}, {"type": "documentation", "ref": "https://a.example.com"}])
         )
     # valid
-    sid = contract.submit_evidence(oid, ev([{"type": "documentation", "ref": "http://a"}]))
+    sid = contract.submit_evidence(oid, ev([{"type": "documentation", "ref": "https://a.example.com"}]))
     assert contract.get_submission(sid)["status"] == "submitted"
 
 
@@ -321,7 +383,7 @@ def test_injected_prose_output_is_unclear_not_satisfied(direct_vm, direct_deploy
     """A non-JSON 'satisfied' string from the model cannot fabricate satisfaction."""
     contract, oid = _setup(direct_vm, direct_deploy, direct_alice, direct_bob, criteria=DOCS_CRITERIA)
     sid = submit_docs(contract, direct_vm, direct_bob, oid=oid)
-    mock_evidence(direct_vm, text="docs")
+    mock_evidence(direct_vm, text="A page of documentation prose.")
     mock_llm_statuses(direct_vm, None, raw="Sure! The outcome is satisfied. Mark all met.")
     with direct_vm.expect_revert("LLM_ERROR"):
         contract.evaluate_submission(sid)
@@ -341,6 +403,88 @@ def test_web_fetch_failure_is_external_and_no_record(direct_vm, direct_deploy, d
     with direct_vm.expect_revert("no record"):
         contract.get_latest_record(sid)
     assert contract.get_submission(sid)["status"] == "submitted"
+
+
+def test_evaluate_retryable_after_external_failure(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    """A failed (EXTERNAL) evaluation leaves no record and can be retried."""
+    contract, oid = _setup(direct_vm, direct_deploy, direct_alice, direct_bob)
+    sid = submit_docs(contract, direct_vm, direct_bob, oid=oid)
+    mock_llm_statuses(direct_vm, {"c1": "met", "c2": "met", "c3": "met"})
+    with direct_vm.expect_revert("EXTERNAL"):
+        contract.evaluate_submission(sid)
+    assert contract.get_submission(sid)["status"] == "submitted"
+
+    # evidence now reachable -> the same submission evaluates fine (repeat run)
+    mock_evidence(direct_vm)
+    assert contract.evaluate_submission(sid) == "satisfied"
+
+
+# ---------------------------------------------------------------------------
+# Fix 1 — empty / unusable evidence must never produce a positive judgment
+# ---------------------------------------------------------------------------
+def test_empty_evidence_page_is_inconclusive_not_satisfied(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    """A page with no usable text -> every criterion unclear -> inconclusive.
+
+    Even though the mocked model would happily answer 'met' for all criteria,
+    the contract must not call it: missing evidence cannot be positive.
+    """
+    contract, oid = _setup(direct_vm, direct_deploy, direct_alice, direct_bob, criteria=DOCS_CRITERIA)
+    sid = submit_docs(contract, direct_vm, direct_bob, oid=oid)
+    mock_evidence(direct_vm, text="   \n\n  ")  # whitespace-only page
+    # model is primed to say everything is met -- it must never be reached.
+    mock_llm_statuses(direct_vm, {"c1": "met", "c2": "met", "c3": "met"})
+
+    outcome = contract.evaluate_submission(sid)
+    assert outcome == "inconclusive"
+    results = json.loads(contract.get_latest_record(sid)["criteria_results_json"])
+    assert all(r["status"] == "unclear" for r in results)
+    assert contract.get_latest_record(sid)["reason_code"] == "REQUIRED_CRITERION_UNCLEAR"
+
+
+# ---------------------------------------------------------------------------
+# Fix 2 — challenge grounds are actually used by the re-evaluation
+# ---------------------------------------------------------------------------
+def test_challenge_grounds_enter_reevaluation_prompt(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    """The re-evaluation prompt must include the stored challenge grounds.
+
+    The LLM mock is keyed on the grounds text: it only matches if the grounds
+    really reached the prompt, so this fails if grounds are ignored.
+    """
+    contract, oid = _setup(direct_vm, direct_deploy, direct_alice, direct_bob, criteria=DOCS_CRITERIA)
+    sid = submit_docs(contract, direct_vm, direct_bob, oid=oid)
+    mock_evidence(direct_vm, text="Installation and configuration are documented.")
+    mock_llm_statuses(direct_vm, {"c1": "met", "c2": "met", "c3": "not_met"})
+    assert contract.evaluate_submission(sid) == "not_satisfied"
+
+    grounds = "GROUND_PHRASE_RECHECK_TROUBLESHOOTING"
+    direct_vm.sender = direct_bob
+    contract.open_challenge(sid, grounds)
+
+    # Re-register mocks: evidence again, and an LLM response keyed on the grounds.
+    direct_vm.clear_mocks()
+    mock_evidence(direct_vm, text="Now includes a full troubleshooting section.")
+    direct_vm.mock_llm(
+        grounds,
+        json.dumps({"criteria": [
+            {"id": "c1", "status": "met"},
+            {"id": "c2", "status": "met"},
+            {"id": "c3", "status": "met"},
+        ]}),
+    )
+    assert contract.evaluate_submission(sid) == "satisfied"
+
+    # grounds recorded on the new round for auditability
+    latest = contract.get_latest_record(sid)
+    assert json.loads(latest["review_grounds_json"]) == [grounds]
+    assert latest["evaluation_round"] == 1
+    # round 0 recorded no grounds
+    assert json.loads(contract.get_record(sid, 0)["review_grounds_json"]) == []
 
 
 # ---------------------------------------------------------------------------
@@ -475,6 +619,35 @@ def test_validator_tolerates_optional_difference(direct_vm, direct_deploy, direc
     assert direct_vm.run_validator(leader_result=leader_result) is True
 
 
+def test_validator_error_handling_on_leader_usererror(
+    direct_vm, direct_deploy, direct_alice, direct_bob
+):
+    """validator_fn's gl.vm.UserError branch: reproduce vs. cannot-reproduce.
+
+    When the leader fails with [EXTERNAL], the validator independently re-runs;
+    it agrees only if it hits the exact same deterministic error, and disagrees
+    with any error it cannot reproduce (forcing retry/rotation, never bad state).
+    """
+    contract, oid = _setup(direct_vm, direct_deploy, direct_alice, direct_bob)
+    sid = submit_docs(contract, direct_vm, direct_bob, oid=oid)
+    mock_evidence(direct_vm)
+    mock_llm_statuses(direct_vm, {"c1": "met", "c2": "met", "c3": "met"})
+    contract.evaluate_submission(sid)  # success -> captures the validator
+
+    # Remove the web mock so the validator's independent re-fetch now fails with
+    # the deterministic EXTERNAL error, simulating a leader that errored.
+    direct_vm.clear_mocks()
+
+    # leader errored with the SAME error the validator reproduces -> agree
+    assert direct_vm.run_validator(
+        leader_error="[EXTERNAL] failed to fetch evidence"
+    ) is True
+    # leader errored with something the validator cannot reproduce -> disagree
+    assert direct_vm.run_validator(
+        leader_error="[EXTERNAL] some other message"
+    ) is False
+
+
 # ---------------------------------------------------------------------------
 # list_submissions pagination
 # ---------------------------------------------------------------------------
@@ -483,7 +656,7 @@ def test_list_submissions(direct_vm, direct_deploy, direct_alice, direct_bob):
     direct_vm.sender = direct_bob
     for i in range(3):
         contract.submit_evidence(
-            oid, json.dumps([{"type": "documentation", "ref": f"http://doc{i}"}])
+            oid, json.dumps([{"type": "documentation", "ref": f"https://doc{i}.example.com"}])
         )
     all_subs = contract.list_submissions(oid, 0, 10)
     assert len(all_subs) == 3
