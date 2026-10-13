@@ -1,0 +1,5 @@
+genlayer-test>=0.29
+genvm-linter>=0.11
+pytest
+fastapi
+uvicorn
