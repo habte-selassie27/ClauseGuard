@@ -276,6 +276,14 @@ def _parse_https_url(ref):
     if not _is_valid_hostname(host):
         return "", ""
     suffix = rest[len(authority):]
+    # Canonical form (dedupe only): drop the fragment (never sent to the server)
+    # and normalize an empty path to "/", so URL variants of one resource are
+    # detected as duplicates of each other.
+    fragment = suffix.find("#")
+    if fragment != -1:
+        suffix = suffix[:fragment]
+    if suffix == "":
+        suffix = "/"
     return host, "https://" + host + suffix
 
 
@@ -446,9 +454,13 @@ def _extract_criteria_entries(obj):
     if not isinstance(obj, dict):
         return None
     for key in ("criteria", "results", "assessments", "criteria_results", "items"):
-        val = obj.get(key)
-        if isinstance(val, list):
-            return val
+        if key in obj:
+            val = obj[key]
+            if isinstance(val, list):
+                return val
+            # A recognizable key holding the wrong type is a schema violation,
+            # not a usable result.
+            return None
     # maybe a bare dict of id->status
     if obj and all(isinstance(v, str) for v in obj.values()):
         return [{"id": k, "status": v} for k, v in obj.items()]
@@ -458,8 +470,11 @@ def _extract_criteria_entries(obj):
 def _parse_llm_criteria(raw, criteria_meta):
     """Normalize model output into criteria_results (id/status/required) order.
 
-    Enforces enums (unknown -> unclear), fills missing criteria as unclear,
-    ignores unknown criterion ids, and treats duplicated ids as unclear. Only
+    Enforces the declared schema and enums: structurally invalid output (not an
+    object, no criteria list, an entry that is not an object, an entry without a
+    criterion id or without a status field) is `[LLM_ERROR]` and writes no
+    record. Unknown statuses become unclear, missing criteria become unclear,
+    duplicated ids become unclear, and unknown criterion ids are ignored. Only
     the obligation's criterion ids ever appear in the result.
     """
     obj = _sanitize_llm_json(raw)
@@ -472,14 +487,18 @@ def _parse_llm_criteria(raw, criteria_meta):
     by_id = {}
     duplicated = set()
     for ent in entries:
-        if isinstance(ent, dict):
-            cid = ent.get("id")
-            if isinstance(cid, str):
-                cid = cid.strip()
-                if cid in by_id:
-                    duplicated.add(cid)
-                else:
-                    by_id[cid] = ent
+        if not isinstance(ent, dict):
+            raise _llm_error("model output entry is not an object")
+        cid = ent.get("id")
+        if not isinstance(cid, str) or not cid.strip():
+            raise _llm_error("model output entry is missing a criterion id")
+        if "status" not in ent:
+            raise _llm_error("model output entry is missing a status")
+        cid = cid.strip()
+        if cid in by_id:
+            duplicated.add(cid)
+        else:
+            by_id[cid] = ent
     results = []
     for meta in criteria_meta:
         cid = meta["id"]
