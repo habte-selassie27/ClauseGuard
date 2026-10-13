@@ -28,15 +28,23 @@ evidence submission recorded
         |
         v
 evaluate_submission                 [non-deterministic block]
-  leader_fn:   fetch evidence (web)
+  leader_fn:   fetch every declared ref (web)
+               -> any fetch failure: [EXTERNAL] (no record, retryable,
+                  partial evidence is never judged)
                -> unusable page (< MIN_EVIDENCE_CHARS): all criteria unclear,
                   model skipped (outcome will be inconclusive)
-               -> else prompt LLM -> parse+normalize ->
-               per-criterion statuses only
+               -> else prompt LLM -> parse+normalize -> per-criterion statuses
+               returns: criteria + digest + per-ref provenance
                (open challenge grounds are included in the prompt)
   validator_fn: independently re-runs leader_fn, then compares via the
-               deterministic equivalence rule
-  consensus:    agree => agreed statuses; disagree => protocol appeal/retry
+               deterministic equivalence rule; UserError is agreed only if
+               reproduced, VMError / unexpected type / any internal error
+               => disagree
+  consensus:    agree => accepted result; disagree => protocol appeal/retry
+        |
+        v
+canonicalize accepted result         [deterministic code: exact criterion ids,
+                                      missing/duplicate/unknown -> unclear]
         |
         v
 derive outcome + reason_code        [deterministic code, in the write method]
@@ -49,12 +57,12 @@ ComplianceRecord stored (round r); challenge (if any) resolved
 
 All persisted state uses GenLayer types — **no raw `dict`/`list` in storage**:
 
-- `obligations: TreeMap[str, Obligation]`
+- `obligations: TreeMap[str, Obligation]` (includes `allow_any_https_source`)
 - `submissions: TreeMap[str, Submission]`
 - `records: TreeMap[str, ComplianceRecord]` — key `"<submission_id>:<round>"`
 - `latest_record_key: TreeMap[str, str]`
 - `num_rounds: TreeMap[str, u256]`
-- `challenges: TreeMap[str, Challenge]`
+- `challenges: TreeMap[str, Challenge]` (includes `challenged_round`)
 - `challenge_count: TreeMap[str, u256]`
 - `next_obligation_num: u256`
 
@@ -68,20 +76,35 @@ method; changing an obligation means creating a new one (new `obligation_id`).
 
 ## Evidence source handling
 
-- Refs must be **`https://`** (plain `http://` is rejected as spoofable).
-- Each obligation may declare a **trusted-host allowlist**
-  (`trusted_hosts_json`, bare host suffixes; `[]` = any https host). A ref's
-  host must equal an entry or be a subdomain of one.
-- Every evidence item stores its normalized **`host`** alongside `type`/`ref`,
-  so provenance is auditable on-chain (`submission.evidence_json` and the
-  `ComplianceRecord` both carry it).
+Two separate concerns, deliberately not conflated:
+
+**1. URL syntax** (`_parse_https_url`, rejects rather than normalizes): scheme must
+be `https://`; user-info, IPv6/IPv4 literals, ports other than `443`, trailing
+dots, whitespace, empty authorities, single-label hosts, all-numeric labels, and
+non-ASCII/malformed labels are all invalid.
+
+**2. Source authorization** (per obligation, explicit and fail-closed): a
+non-empty `trusted_hosts_json` allowlist (bare hostnames) **or** an explicit
+`allow_any_https_source=true` opt-in — never both, never neither. Matching is
+exact-host or explicit subdomain at a label boundary, so `example.com` does not
+authorize `fakeexample.com`.
+
+- Every evidence item stores its normalized **`host`** alongside `type`/`ref`, and
+  duplicates are detected on the canonicalized URL, so provenance is auditable
+  on-chain (`submission.evidence_json` and each `ComplianceRecord` carry it).
 - Syntactic validity is still not authenticity — fetch content is treated as
-  untrusted, normalized, and truncated before judging.
+  untrusted, normalized (trimmed), truncated deterministically, and only ever
+  judged as data.
 
 ## Determinism boundary
 
 - Everything outside the `gl.vm.run_nondet_unsafe` block is deterministic:
-  validation, parsing/normalization, outcome derivation, storage writes.
+  validation, canonicalization, parsing/normalization, outcome derivation,
+  storage writes.
 - Only the leader/validator block touches the network and the LLM.
 - The `leader_fn`/`validator_fn` closures capture **plain data only** (never
   `self`), so they are serializable by cloudpickle for post-execution.
+- The validator never raises: a `UserError` is agreed only when independently
+  reproduced, and a `VMError`, an unexpected result type, or any internal
+  exception is a *disagree* (the pinned `run_nondet_unsafe` documents that it does
+  not sandbox the validator, so the validator defends itself in code).

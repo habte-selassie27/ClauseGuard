@@ -31,7 +31,10 @@ Flow:
 
 1. **Open** — the obligation owner or obligor calls
    `open_challenge(submission_id, grounds)` on an **evaluated** submission.
-   The submission moves `evaluated → challenged`.
+   The submission moves `evaluated → challenged`, and the challenge records the
+   `challenged_round` it disputes. Grounds must be non-blank and ≤ 1000 chars,
+   and only one challenge may be open at a time (a further challenge needs the
+   review round to complete first).
 2. **Re-evaluate** — `evaluate_submission` on a `challenged` submission runs the
    non-deterministic block again in a **new evaluation round**
    (`evaluation_round` increments). The leader/validators independently re-judge;
@@ -49,8 +52,15 @@ Flow:
 5. **Resolve** — once a new record is written, any open challenge(s) for that
    submission are marked `resolved` and the submission returns to `evaluated`.
 
-Constraints: a challenge requires an evaluated submission, a party caller, and is
-bounded by `MAX_CHALLENGES_PER_SUBMISSION` (3). This bounds dispute spam.
+Constraints: a challenge requires an evaluated submission, a party caller
+(owner or obligor only), non-blank bounded grounds, and is limited to
+`MAX_CHALLENGES_PER_SUBMISSION` (3) per submission, one open at a time. This
+bounds dispute spam and prevents repeated re-evaluation by an unattached third
+party.
+
+Closing an obligation does **not** moot a dispute: `close_obligation` only stops
+*new evidence* (it does not alter criteria), while `open_challenge` and
+re-evaluation remain available for already-evaluated submissions.
 
 ## What `ReviewChallenge` is NOT
 

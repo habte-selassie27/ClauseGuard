@@ -17,8 +17,12 @@ record as **data** and keeps all money movement out of scope.
 ClauseGuard exposes read methods a separate contract can call:
 
 - `get_latest_record(submission_id)` → the current outcome
-- `get_record_history(submission_id)` → all rounds (dispute trail)
-- `get_challenge(challenge_id)` → challenge status
+- `get_record_history(submission_id)` → all rounds (dispute trail), so a payout
+  contract can detect that a later round exists and supersedes an earlier one
+- `get_challenge(challenge_id)` → challenge status (`open` / `resolved`)
+- per-round `evidence_digest`, `evidence_chars`, `evidence_provenance_json` and
+  `evidence_changed` → a payout contract can require that the evidence a payment
+  relied on is the evidence recorded in the round it read
 
 A separate payout contract should:
 
