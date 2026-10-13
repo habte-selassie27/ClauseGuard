@@ -19,7 +19,6 @@ echo
 
 echo "== Gate 1b: genvm-lint schema =="
 genvm-lint schema contracts/clause_guard.py --json | tee proof/02_schema.json
-cp proof/02_schema.json artifacts/contract_schema.json
 echo
 
 echo "== Gate 2: direct tests =="
@@ -29,5 +28,9 @@ echo
 echo "== Gate 3a: glsim consensus deploy =="
 "$PY" scripts/glsim_consensus_deploy.py | tee proof/04_consensus_deploy_glsim.txt
 echo
+
+# gltest clears artifacts/ on startup, so refresh the ABI artifact last.
+mkdir -p artifacts
+cp proof/02_schema.json artifacts/contract_schema.json
 
 echo "All local gates executed. See proof/ for captured evidence."

@@ -7,12 +7,15 @@ Captured by `./scripts/run_gates.sh`. Interpreter: Python 3.12, `GENVM_VERSION=v
 |---|---|---|
 | 1 — `genvm-lint check` | `01_lint_check.json` | **PASS** — `ok:true`, lint `ok`, validate `ok`, 12 methods (5 write / 7 view) |
 | 1b — `genvm-lint schema` | `02_schema.json` | **PASS** — authoritative ABI |
-| 2 — direct tests | `03_direct_tests.txt` | **PASS** — 32/32 |
+| 2 — direct tests | `03_direct_tests.txt` | **PASS** — 38/38 |
 | 3a — GLSim consensus deploy | `04_consensus_deploy_glsim.txt` | **PASS** — FINALIZED, leader + 5 validators agreed, no error |
+| 3b — integration collection | `05_integration_collection_and_network.txt` | **COLLECTS** — 3/3 tests import & collect cleanly; live deploy **BLOCKED (no network egress)** |
 
-Gate 3b (live-network integration) is blocked by the environment, not the
-contract — see `DEPLOYMENT.md` (StudioNet RPC 502; no GLSim LLM provider key;
-gltest↔GLSim schema RPC param mismatch). The contract's consensus logic is
-directly exercised in the direct tests via the captured validator (`run_validator`
-→ agree / disagree / optional-tolerance), and the deploy path is proven under
-full multi-validator consensus (Gate 3a).
+Gate 3b (live-network integration) is blocked by the sandbox, not the
+contract: the integration module imports and collects cleanly (3 tests), but the
+sandbox has **no outbound network egress** (DNS + HTTP both time out, even vs
+`example.com`), so the StudioNet deploy aborts at connect time. The GLSim local
+path additionally has no usable LLM provider key. The contract's consensus logic
+is directly exercised in the direct tests via the captured validator
+(`run_validator` → agree / disagree / optional-tolerance), and the deploy path is
+proven under full multi-validator consensus (Gate 3a). See `DEPLOYMENT.md`.

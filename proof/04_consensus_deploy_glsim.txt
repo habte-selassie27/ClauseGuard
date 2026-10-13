@@ -3,5 +3,5 @@ runners       : pinned GenVM Depends header
 validators    : 5
 consensus status: TxStatus.FINALIZED
 consensus error : None
-contract address: 0x601a53f5d89ff59fb3a886e4d2926d9f2a26e563
+contract address: 0x9cfcab2d2f2910668e9fdad5159304da2f502b83
 DEPLOY_CONSENSUS_OK
