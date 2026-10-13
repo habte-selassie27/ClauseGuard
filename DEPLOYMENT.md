@@ -94,7 +94,22 @@ genlayer network set testnet_bradbury   # or testnet_asimov
 
 ## Deployed address
 
-- **StudioNet (live, verified)** — this revision:
+- **StudioNet — official manual deployment (live, verified)**:
+
+  ```
+  0x34c350cdf050137d773A855d12d7B44bF289aAa2
+  ```
+
+  - Studio (import): https://studio.genlayer.com/?import-contract=0x34c350cdf050137d773A855d12d7B44bF289aAa2
+  - Explorer: https://explorer-studio.genlayer.com/address/0x34c350cdf050137d773A855d12d7B44bF289aAa2
+
+  Deployed manually from `contracts/clause_guard.py` and re-verified afterwards:
+  `genlayer code` is content-identical to the local contract (54,872 bytes,
+  sha256 `84c2bb2475704363532d44affc96f7e41e9f4a8e436e01cb8d35c18318a9e395`),
+  the pinned `Depends` header is intact, and `genlayer schema` matches
+  `proof/02_schema.json` exactly (12 methods). Capture:
+  `proof/08_studionet_manual_deploy.txt`.
+- **StudioNet — earlier automated test deploy**:
 
   ```
   0x8D9c54Ca588D9fd58486672Ef71A8D7695B69b0e

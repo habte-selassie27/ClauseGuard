@@ -109,15 +109,24 @@ leader+validator consensus instead of a bare deploy.
 4. Disagreement/failure → `[EXTERNAL]` (no record, retryable) / `[LLM_ERROR]` /
    protocol-level disagreement (never overridden locally).
 
-## Deployed address (StudioNet)
+## Deployed address (StudioNet) — official manual deployment
 
 ```
-0x8D9c54Ca588D9fd58486672Ef71A8D7695B69b0e
+0x34c350cdf050137d773A855d12d7B44bF289aAa2
 ```
 
-Verified byte-identical to `contracts/clause_guard.py`. A live evaluation of this
-contract (obligation requiring installation/configuration/troubleshooting docs,
-evidence = `https://docs.python.org/3/tutorial/introduction.html`) recorded
+- Studio (import): https://studio.genlayer.com/?import-contract=0x34c350cdf050137d773A855d12d7B44bF289aAa2
+- Explorer: https://explorer-studio.genlayer.com/address/0x34c350cdf050137d773A855d12d7B44bF289aAa2
+
+Re-verified after deployment: `genlayer code` is content-identical to
+`contracts/clause_guard.py` (54,872 bytes, sha256 `84c2bb24…`), and
+`genlayer schema` matches `proof/02_schema.json` exactly (12 methods) — see
+`proof/08_studionet_manual_deploy.txt`.
+
+An earlier automated deploy of the same contract
+(`0x8D9c54Ca588D9fd58486672Ef71A8D7695B69b0e`, by the integration suite) carried a
+live evaluation: obligation requiring installation/configuration/troubleshooting
+docs, evidence = `https://docs.python.org/3/tutorial/introduction.html` recorded
 `not_satisfied` / `REQUIRED_CRITERION_NOT_MET`, `evaluation_round=0`,
 `evidence_chars=4000` (per-ref cap applied) and a 64-hex `evidence_digest` — see
 `proof/07_studionet_deploy_and_record.txt`.

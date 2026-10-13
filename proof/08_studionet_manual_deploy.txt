@@ -1,0 +1,23 @@
+ClauseGuard — official StudioNet manual deployment (verification capture)
+=======================================================================
+
+Deployed address : 0x34c350cdf050137d773A855d12d7B44bF289aAa2
+Network          : studionet (genlayer network set)
+Studio (import)  : https://studio.genlayer.com/?import-contract=0x34c350cdf050137d773A855d12d7B44bF289aAa2
+Explorer         : https://explorer-studio.genlayer.com/address/0x34c350cdf050137d773A855d12d7B44bF289aAa2
+
+--- 1. genlayer code (pinned header) ---------------------------------
+# { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
+
+--- 2. code vs contracts/clause_guard.py -----------------------------
+local    : 54872 bytes  sha256=84c2bb2475704363532d44affc96f7e41e9f4a8e436e01cb8d35c18318a9e395
+deployed : 54874 bytes (incl. trailing blank lines from CLI output)
+content identical (trailing whitespace ignored): True
+
+--- 3. genlayer schema vs proof/02_schema.json ------------------------
+deployed methods : 12
+local methods    : 12
+names match      : True
+signature diffs  : none
+ctor match       : True
+register_obligation params: [['description', 'string'], ['obligor', 'string'], ['criteria_json', 'string'], ['min_evidence', 'int'], ['max_evidence', 'int'], ['allowed_types_json', 'string'], ['trusted_hosts_json', 'string'], ['allow_any_https_source', 'bool']]

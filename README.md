@@ -393,10 +393,24 @@ StudioNet with a real model and real web fetch.
 
 ## Network + deployed address
 
-- **StudioNet (live, verified)** — this revision:
-  `0x8D9c54Ca588D9fd58486672Ef71A8D7695B69b0e`. Deployed code is byte-identical to
-  `contracts/clause_guard.py`; the integration suite passed 3/3 (`proof/06`), and a
-live record read is captured in `proof/07`: obligation requiring
+- **StudioNet (official manual deployment, live, verified)**:
+
+  ```
+  0x34c350cdf050137d773A855d12d7B44bF289aAa2
+  ```
+
+  - Studio: https://studio.genlayer.com/?import-contract=0x34c350cdf050137d773A855d12d7B44bF289aAa2
+  - Explorer: https://explorer-studio.genlayer.com/address/0x34c350cdf050137d773A855d12d7B44bF289aAa2
+
+  Verified post-deploy: `genlayer code` is content-identical to
+  `contracts/clause_guard.py` (54,872 bytes, sha256 `84c2bb24…`), the pinned
+  `Depends` header is present, and `genlayer schema` matches
+  `proof/02_schema.json` — 12 methods, all signatures identical. See
+  `proof/08_studionet_manual_deploy.txt`.
+- **StudioNet (earlier automated test deploy)** —
+  `0x8D9c54Ca588D9fd58486672Ef71A8D7695B69b0e`. Deployed by the integration
+  suite, which passed 3/3 (`proof/06`), and a
+  live record read is captured in `proof/07`: obligation requiring
   installation/configuration/troubleshooting docs, evidence =
   `https://docs.python.org/3/tutorial/introduction.html` →
   `not_satisfied` / `REQUIRED_CRITERION_NOT_MET`, `evaluation_round=0`,
