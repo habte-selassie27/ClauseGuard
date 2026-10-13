@@ -1,0 +1,58 @@
+# Gate 3b (live StudioNet) — deployed contract inspection
+# Deployed address: 0x8D9c54Ca588D9fd58486672Ef71A8D7695B69b0e
+# Deployed at revision: 1f84a57+working tree
+# Contract source in this repo: contracts/clause_guard.py
+# Deployed by: tests/integration/test_clause_guard.py (gltest, gasless StudioNet)
+
+## 1. Deployed code matches the working tree
+deployed_code_chars : 54857
+local_source_chars  : 54857
+IDENTICAL           : True
+
+## 2. Deployed ABI includes the explicit source-policy parameter
+        [ 'trusted_hosts_json', 'string' ],
+        [ 'allow_any_https_source', 'bool' ]
+      ],
+      kwparams: {},
+
+## 3. Live record read (get_latest_record obl_1#0)
+# Evidence used: https://docs.python.org/3/tutorial/introduction.html
+# (the obligation requires installation + configuration + troubleshooting docs)
+Result:
+{
+  criteria_results_json: '[{"id": "c1", "status": "not_met", "required": true}, {"id": "c2", "status": "not_met", "required": true}, {"id": "c3", "status": "not_met", "required": true}]',
+  evaluation_round: 0,
+  evidence_changed: false,
+  evidence_chars: 4000,
+  evidence_digest: '86d00c7d9bf4fc392508248434d3a080b12a9465e6d4236913ca7a7573aea4b4',
+  evidence_json: '[{"type": "documentation", "ref": "https://docs.python.org/3/tutorial/introduction.html", "host": "docs.python.org"}]',
+  evidence_provenance_json: '[{"ref": "https://docs.python.org/3/tutorial/introduction.html", "host": "docs.python.org", "chars": 4000}]',
+  obligation_id: 'obl_1',
+  outcome: 'not_satisfied',
+  reason_code: 'REQUIRED_CRITERION_NOT_MET',
+  review_grounds_json: '[]',
+  submission_id: 'obl_1#0'
+}
+
+✔ Read operation successfully executed
+
+## 4. Live record history (get_record_history obl_1#0)
+Result:
+{
+  '0': {
+    criteria_results_json: '[{"id": "c1", "status": "not_met", "required": true}, {"id": "c2", "status": "not_met", "required": true}, {"id": "c3", "status": "not_met", "required": true}]',
+    evaluation_round: 0,
+    evidence_changed: false,
+    evidence_chars: 4000,
+    evidence_digest: '86d00c7d9bf4fc392508248434d3a080b12a9465e6d4236913ca7a7573aea4b4',
+    evidence_json: '[{"type": "documentation", "ref": "https://docs.python.org/3/tutorial/introduction.html", "host": "docs.python.org"}]',
+    evidence_provenance_json: '[{"ref": "https://docs.python.org/3/tutorial/introduction.html", "host": "docs.python.org", "chars": 4000}]',
+    obligation_id: 'obl_1',
+    outcome: 'not_satisfied',
+    reason_code: 'REQUIRED_CRITERION_NOT_MET',
+    review_grounds_json: '[]',
+    submission_id: 'obl_1#0'
+  }
+}
+
+✔ Read operation successfully executed

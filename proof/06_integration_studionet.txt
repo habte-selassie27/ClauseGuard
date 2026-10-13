@@ -1,3 +1,5 @@
+[preflight] network=studionet host=studio.genlayer.com
+[preflight] DNS ok — attempting RPC via gltest...
 INFO: File `gltest.config.yaml` found in the current directory, using it
 INFO: Clearing artifacts directory: artifacts
 INFO: Using the following configuration:
@@ -21,9 +23,10 @@ plugins: genlayer-test-0.29.2, anyio-4.15.1
 collecting ... collected 3 items
 
 tests/integration/test_clause_guard.py::test_register_returns_obligation_id 
-[studionet] ClauseGuard deployed at: 0x589eC8F89cbaA9fe1F006282EdCB0B8B3f6E6d9d
+[studionet] ClauseGuard deployed at: 0x8D9c54Ca588D9fd58486672Ef71A8D7695B69b0e
 PASSED
 tests/integration/test_clause_guard.py::test_full_flow_register_submit_evaluate_read PASSED
 tests/integration/test_clause_guard.py::test_submission_validation_reverts PASSED
 
-========================= 3 passed in 80.52s (0:01:20) =========================
+========================= 3 passed in 92.57s (0:01:32) =========================
+EXIT=0

@@ -1,0 +1,26 @@
+contract        : clause_guard.py
+runners         : pinned GenVM Depends header
+validators      : 5
+nondet mocks    : deterministic web + LLM (no network egress here)
+
+deploy          : status=TxStatus.FINALIZED address=0xd990341e254984ec41dd3211fc9ce53b794ec28a error=None
+PASS   deploy reaches consensus — 5 validators, no error
+PASS   register_obligation (trusted-host allowlist) — status=TxStatus.FINALIZED votes=5/5 agree
+PASS   obligation stores the explicit source policy — ["docs.example.com"]
+PASS   reject empty allowlist without any-host opt-in — status=TxStatus.FINALIZED votes=5/5 agree error=UserError(message='[EXPECTED] trusted_hosts must be non-empty: name the allowed hosts, or set allow_any_https_source=true to accept any https host')
+PASS   reject allowlist combined with any-host opt-in — status=TxStatus.FINALIZED votes=5/5 agree error=UserError(message='[EXPECTED] trusted_hosts must be empty when allow_any_https_source is true')
+PASS   reject off-policy evidence host — status=TxStatus.FINALIZED votes=5/5 agree error=UserError(message='[EXPECTED] evidence host not in trusted sources')
+PASS   reject malformed https evidence URL — status=TxStatus.FINALIZED votes=5/5 agree error=UserError(message='[EXPECTED] evidence ref is not a well-formed https URL')
+PASS   submit evidence (policy-compliant https host) — status=TxStatus.FINALIZED votes=5/5 agree
+PASS   evaluate_submission (leader + validators) — status=TxStatus.FINALIZED votes=5/5 agree
+PASS   round 0 outcome derived deterministically — satisfied
+PASS   round 0 record (outcome, reason_code, digest) — digest=c1e1e7c294d7f190… chars=126
+PASS   evidence provenance recorded — [{'ref': 'https://docs.example.com/guide', 'host': 'docs.example.com', 'chars': 126}]
+PASS   open_challenge (party, bounded) — status=TxStatus.FINALIZED votes=5/5 agree
+PASS   re-evaluate challenged submission (round 1) — status=TxStatus.FINALIZED votes=5/5 agree
+PASS   round 1 outcome derived deterministically — not_satisfied
+PASS   history preserves the earlier round
+PASS   review round records grounds + evidence change
+PASS   challenge resolved after review round — resolved (round 0)
+
+CONSENSUS_FLOW_OK

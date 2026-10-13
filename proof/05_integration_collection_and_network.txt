@@ -1,13 +1,16 @@
-# Gate 3b — live-network integration: collection check + network diagnosis
+# Gate 3b — live-network integration: collection check + network reachability
 # Run: python3.12 -m pytest tests/integration/ --collect-only -q
 
 tests/integration/test_clause_guard.py::test_register_returns_obligation_id
 tests/integration/test_clause_guard.py::test_full_flow_register_submit_evaluate_read
 tests/integration/test_clause_guard.py::test_submission_validation_reverts
-3 tests collected in 0.01s
+3 tests collected in 0.02s
 
-# Network egress check (the blocker): DNS + HTTP both time out in this sandbox.
-DNS  studio.genlayer.com : ok
-HTTP example.com         : 200
-# Conclusion: integration test module is valid (collects cleanly); the deploy
-# cannot run here because the sandbox has no outbound network egress.
+# Network reachability (checked before running the live gate)
+DNS  studio.genlayer.com : ok (2606:4700:3037::ac43:d2b6, 2606:4700:3033::6815:3554)
+HTTP https://example.com : 200
+
+# Conclusion: the integration module is valid (collects cleanly) AND outbound
+# network egress is available from this environment, so Gate 3b was executed
+# against live StudioNet — see proof/06_integration_studionet.txt (3 passed) and
+# proof/07_studionet_deploy_and_record.txt (deployed code/ABI + a real record read).
