@@ -36,10 +36,17 @@ Flow:
    non-deterministic block again in a **new evaluation round**
    (`evaluation_round` increments). The leader/validators independently re-judge;
    the deterministic outcome derivation runs again.
-3. **Preserve history** — prior rounds are never overwritten;
+3. **Grounds are used, not just stored** — before that round, every `open`
+   challenge's `grounds` are collected and injected into the evaluation prompt as
+   "REVIEW GROUNDS: re-check these specific points". The prompt tells the
+   evaluator to treat them as arguments to weigh against the evidence, not as
+   instructions (so a ground cannot force `met`). They are then written to the
+   new round's `ComplianceRecord.review_grounds_json`, making the dispute trail
+   auditable on-chain. A round with no open challenge records `[]`.
+4. **Preserve history** — prior rounds are never overwritten;
    `get_record_history` returns all rounds. The `ComplianceRecord` for the new
    round becomes the latest.
-4. **Resolve** — once a new record is written, any open challenge(s) for that
+5. **Resolve** — once a new record is written, any open challenge(s) for that
    submission are marked `resolved` and the submission returns to `evaluated`.
 
 Constraints: a challenge requires an evaluated submission, a party caller, and is

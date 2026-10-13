@@ -28,9 +28,9 @@ views. Errors use fixed, deterministic prefixes.
 
 | Method | Args | Returns | Notes |
 |---|---|---|---|
-| `register_obligation` | `description, obligor, criteria_json, min_evidence, max_evidence, allowed_types_json` | `obligation_id: str` | Caller becomes the owner. Validates all bounds. |
+| `register_obligation` | `description, obligor, criteria_json, min_evidence, max_evidence, allowed_types_json, trusted_hosts_json` | `obligation_id: str` | Caller becomes the owner. `min_evidence >= 1`. `trusted_hosts_json` = allowed https host suffixes (`[]` = any). |
 | `close_obligation` | `obligation_id` | — | Owner only. |
-| `submit_evidence` | `obligation_id, evidence_json` | `submission_id: str` | Obligor only, obligation must be active. |
+| `submit_evidence` | `obligation_id, evidence_json` | `submission_id: str` | Obligor only, obligation must be active. **HTTPS-only**; host provenance recorded; trusted-host policy enforced. |
 | `evaluate_submission` | `submission_id` | `outcome: str` | Runs the non-deterministic block; derives + stores the record. |
 | `open_challenge` | `submission_id, grounds` | `challenge_id: str` | Owner or obligor; on an evaluated submission. |
 
@@ -51,8 +51,11 @@ views. Errors use fixed, deterministic prefixes.
 - `criteria_json`: `[{"id":"c1","text":"…","required":true}, …]` (1..20 items,
   unique ids, at least one `required`).
 - `allowed_types_json`: `["documentation", …]`.
+- `trusted_hosts_json`: `["docs.python.org", …]` — allowed evidence hosts
+  (bare hostnames; a host matches if equal or a subdomain). `[]` allows any.
 - `evidence_json`: `[{"type":"documentation","ref":"https://…"}, …]` (count in
-  `[min_evidence, max_evidence]`, http(s) refs, no duplicates).
+  `[min_evidence, max_evidence]`, **https://** refs only, no duplicates).
+  Each item stores its normalized `host` for provenance.
 
 ### Error prefixes (deterministic across validators)
 
@@ -79,6 +82,11 @@ the model:
 
 - **Non-required** criteria are recorded but never decide the outcome alone.
 - **Mixed cases prefer the conservative `inconclusive`** (unclear wins over not_met).
+- **Missing / unusable evidence can never be positive.** Evidence must be
+  present at submission (`min_evidence >= 1`), and if the fetched pages contain
+  fewer than `MIN_EVIDENCE_CHARS` usable characters, the contract **does not call
+  the model at all** — every criterion is forced to `unclear`, so the outcome is
+  `inconclusive`, never `satisfied`/`not_satisfied`.
 - **Incomplete evidence** (below `min_evidence`, missing a required type) is
   rejected at submission (`[EXPECTED]`). Evidence that is present but
   insufficient → the model marks the criterion `unclear` → `inconclusive`.
@@ -147,6 +155,10 @@ evidence.
 bypasses) GenLayer's protocol-level transaction appeals:
 
 - A party (`open_challenge`) disputes an evaluated submission on stated grounds.
+- The stored **grounds are actually used**: on the next `evaluate_submission`
+  they are injected into the evaluation prompt as review points to weigh (and,
+  like evidence, framed so they cannot override the criteria), then persisted on
+  the new `ComplianceRecord` as `review_grounds_json`.
 - A re-evaluation runs in a **new evaluation round** (`evaluation_round`
   increments); prior rounds are preserved (`get_record_history`).
 - Challenges are bounded (`MAX_CHALLENGES_PER_SUBMISSION`) and must be on an

@@ -21,9 +21,9 @@ aliased runners. `GENVM_VERSION=v0.2.12` selects the matching SDK for
 |---|---|---|---|
 | 1 — lint + validate | `genvm-lint check contracts/clause_guard.py --json` | **PASS** (`ok:true`, 12 methods) | `proof/01_lint_check.json` |
 | 1b — schema (ABI) | `genvm-lint schema contracts/clause_guard.py --json` | **PASS** | `proof/02_schema.json`, `artifacts/contract_schema.json` |
-| 2 — direct tests | `pytest tests/direct/ -v` | **PASS** (32/32) | `proof/03_direct_tests.txt` |
+| 2 — direct tests | `pytest tests/direct/ -v` | **PASS** (38/38) | `proof/03_direct_tests.txt` |
 | 3a — consensus deploy (offline GLSim) | `python3 scripts/glsim_consensus_deploy.py` | **PASS** (FINALIZED, leader + 5 validators agreed) | `proof/04_consensus_deploy_glsim.txt` |
-| 3b — live-network integration | `gltest tests/integration/ --network <net>` | **BLOCKED** (environment — see below) | — |
+| 3b — live-network integration | `gltest tests/integration/ --network <net>` | **BLOCKED — no network egress** (test module collects 3/3 cleanly; sandbox cannot reach the internet) | `proof/05_integration_collection_and_network.txt` |
 
 Run them all with `./scripts/run_gates.sh`.
 
@@ -32,8 +32,14 @@ Run them all with `./scripts/run_gates.sh`.
 The integration tests need a reachable GenLayer network whose validators can run a
 **real LLM**. In this environment:
 
-- **StudioNet RPC is down**: `eth_getTransactionByHash` returns a
-  `502 Bad Gateway` (the hosted Studio gateway is unreachable).
+- **No outbound network egress (verified)**: this sandbox cannot reach the
+  internet at all — DNS lookup for `studio.genlayer.com` times out and even
+  `https://example.com` fails (`curl` exit 124 / `Temporary failure in name
+  resolution`). So the StudioNet deploy aborts at
+  `Failed to establish a new connection`. Evidence:
+  `proof/05_integration_collection_and_network.txt`. This is a sandbox
+  limitation, not a GenLayer or ClauseGuard issue (the earlier `502` from the
+  Studio gateway is the same reachability problem from a different probe).
 - **GLSim (local) has no usable LLM provider**: `OPENAI_API_KEY` is unset and
   `ANTHROPIC_API_KEY` is a placeholder that returns `401`. Without a provider,
   `evaluate_submission`'s LLM call cannot execute on validators.

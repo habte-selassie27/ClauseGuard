@@ -13,7 +13,7 @@ Scope: **contract + tests + evidence** (no frontend).
 | Path | Contents |
 |---|---|
 | `contracts/clause_guard.py` | The intelligent contract (pinned GenVM runner). |
-| `tests/direct/` | 32 fast in-memory tests (real pinned SDK; web + LLM mocked). |
+| `tests/direct/` | 38 fast in-memory tests (real pinned SDK; web + LLM mocked). |
 | `tests/integration/` | Live-network consensus tests (gltest; real LLM). |
 | `scripts/` | `run_gates.sh`, `run_integration.sh`, `glsim_consensus_deploy.py`. |
 | `proof/` | Captured evidence for every gate that ran. |
@@ -26,9 +26,9 @@ Scope: **contract + tests + evidence** (no frontend).
 |---|---|---|
 | 1 — `genvm-lint check` | **PASS** — `ok:true`, 12 methods (5 write, 7 view) | `proof/01_lint_check.json` |
 | 1b — `genvm-lint schema` | **PASS** | `proof/02_schema.json` |
-| 2 — direct tests | **PASS** — 32/32 | `proof/03_direct_tests.txt` |
+| 2 — direct tests | **PASS** — 38/38 | `proof/03_direct_tests.txt` |
 | 3a — GLSim consensus deploy | **PASS** — FINALIZED, leader + 5 validators agreed | `proof/04_consensus_deploy_glsim.txt` |
-| 3b — live-network integration | **BLOCKED (environment)** — StudioNet RPC 502; no GLSim LLM key; gltest↔GLSim schema param mismatch. Contract is not the cause (see `DEPLOYMENT.md`). | — |
+| 3b — live-network integration | **BLOCKED (no network egress)** — test module collects 3/3 cleanly; sandbox has no outbound DNS/HTTP (verified vs `example.com`); GLSim path also has no LLM key. Contract is not the cause (see `DEPLOYMENT.md`). | `proof/05_integration_collection_and_network.txt` |
 
 ## Key design commitments (per AGENTS.md)
 
@@ -40,6 +40,14 @@ Scope: **contract + tests + evidence** (no frontend).
   criteria tolerated).
 - **Input validation runs before any LLM/web work**; cheap garbage is rejected
   with `[EXPECTED]`.
+- **No positive judgment without evidence** — `min_evidence >= 1`, and an
+  empty/unusable fetched page forces every criterion to `unclear` (model never
+  called) → `inconclusive`.
+- **Evidence sources are hardened** — HTTPS-only refs, optional per-obligation
+  trusted-host allowlist, and normalized `host` provenance recorded on every
+  evidence item.
+- **Challenge grounds are used** — injected into the re-evaluation prompt as
+  review points and persisted on the new record (`review_grounds_json`).
 - **Deterministic error prefixes** (`[EXPECTED]`, `[EXTERNAL]`, `[TRANSIENT]`,
   `[LLM_ERROR]`).
 - **Obligations immutable once evidence is submitted**; no edit method.

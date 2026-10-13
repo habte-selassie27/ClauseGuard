@@ -39,6 +39,14 @@ Exactly one of:
   `inconclusive`. The remedy is a better-written obligation, not a guess.
 - **Non-required only failing** — an optional criterion that is `not_met` or
   `unclear` does **not** change a `satisfied` outcome.
+- **Missing / unusable evidence (empty-evidence guard)** — two layers prevent a
+  positive judgment without real content:
+  1. `min_evidence >= 1` is enforced at registration, so an obligation can never
+     be created that accepts zero evidence.
+  2. If the fetched pages yield fewer than `MIN_EVIDENCE_CHARS` usable
+     characters (empty/whitespace-only page), `leader_fn` **skips the model**
+     and returns `unclear` for every criterion → `inconclusive`. A model primed
+     to answer `met` is never reached, so it cannot fabricate `satisfied`.
 
 ## Defensive parsing (what the model returns never fully trusted)
 

@@ -28,8 +28,12 @@ evidence submission recorded
         |
         v
 evaluate_submission                 [non-deterministic block]
-  leader_fn:   fetch evidence (web) -> prompt LLM -> parse+normalize ->
+  leader_fn:   fetch evidence (web)
+               -> unusable page (< MIN_EVIDENCE_CHARS): all criteria unclear,
+                  model skipped (outcome will be inconclusive)
+               -> else prompt LLM -> parse+normalize ->
                per-criterion statuses only
+               (open challenge grounds are included in the prompt)
   validator_fn: independently re-runs leader_fn, then compares via the
                deterministic equivalence rule
   consensus:    agree => agreed statuses; disagree => protocol appeal/retry
@@ -61,6 +65,18 @@ storage pattern) so the persisted model stays flat and robust.
 
 Obligations are **immutable once evidence is submitted** — there is no edit
 method; changing an obligation means creating a new one (new `obligation_id`).
+
+## Evidence source handling
+
+- Refs must be **`https://`** (plain `http://` is rejected as spoofable).
+- Each obligation may declare a **trusted-host allowlist**
+  (`trusted_hosts_json`, bare host suffixes; `[]` = any https host). A ref's
+  host must equal an entry or be a subdomain of one.
+- Every evidence item stores its normalized **`host`** alongside `type`/`ref`,
+  so provenance is auditable on-chain (`submission.evidence_json` and the
+  `ComplianceRecord` both carry it).
+- Syntactic validity is still not authenticity — fetch content is treated as
+  untrusted, normalized, and truncated before judging.
 
 ## Determinism boundary
 
